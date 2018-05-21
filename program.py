@@ -9,19 +9,13 @@ Tmax = data[:,2].max()
 N=10
 dt=(Tmax-Tmin)//N
 
-def dict_append(dict, key, value):
-    if key == N:
-        dict_append(dict,key-1,value)
-        return
-    if key not in dict:
-        dict[key] = [value]
-    else:
-        dict[key] += [value]
 
 groups = {}
 for row in data:
     index = (row[2]-Tmin)//dt
-    dict_append(groups,index,row)
+    if index==N: index=N-1
+    groups[index] = groups.get(index,[]) + [row]
+
 print('Grouped:')
 for item in groups.items():
     print(item)
