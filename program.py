@@ -20,7 +20,8 @@ print('Grouped:')
 for item in groups.items():
     print(item)
 
-##ToDo
-## load each graph seperated
-#G=[nx.Graph() for i in range(N)]
+G=[nx.Graph() for i in range(N)]
 
+for group in groups:
+    for row in groups[group]:
+        G[group].add_edge(row[0],row[1],time=row[2])
