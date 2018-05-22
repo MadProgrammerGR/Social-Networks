@@ -2,15 +2,24 @@ import networkx as nx
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
+from datetime import datetime as date
+
+
+def tmsp2str(seconds):
+    return date.fromtimestamp(seconds).strftime('%Y/%m/%d %H:%M')
 
 data = pd.read_csv('sx-stackoverflow.txt',nrows=1000,delimiter=' ',dtype=int,header=None,names=['src','dest','time']).values
 Tmin = data[:,2].min()
 Tmax = data[:,2].max()
-
 N=2
 dt=(Tmax-Tmin)//N
+print('Oldest date:',tmsp2str(Tmin))
+print('Newest date:',tmsp2str(Tmax))
+print('Number of partitions:',N)
+print('Time interval for each partition:',date.fromtimestamp(Tmin+dt)-date.fromtimestamp(Tmin))
 
 
+# group edges between every dt interval
 groups = {}
 for row in data:
     index = (row[2]-Tmin)//dt
@@ -22,28 +31,29 @@ for row in data:
 #    print(item)
 
 G=[nx.DiGraph() for i in range(N)]
-
 for group in groups:
     for row in groups[group]:
         G[group].add_edge(row[0],row[1],time=row[2])
 
-def draw(G,subplot,pos,measurement,measurement_title):
-    plt.subplot(subplot)
-    nx.draw(G,pos,node_size=50,node_color=list(measurement.values()),nodelist=list(measurement.keys()))
-    plt.title(measurement_title)
-    
-plt.ion()
-plt.show()
-#xreiazete ligo beltiosi alla kanei doulia pros to paron
-for i in range(N):
-    plt.figure("Graph "+str(i))
-    pos=nx.spring_layout(G[i])
 
-    draw(G[i],331,pos,nx.degree_centrality(G[i]),"Degree centrality")
-    draw(G[i],332,pos,nx.in_degree_centrality(G[i]),"In degree centrality")
-    draw(G[i],333,pos,nx.in_degree_centrality(G[i]),"Out degree centrality")
-    draw(G[i],334,pos,nx.in_degree_centrality(G[i]),"Closeness centrality")
-    draw(G[i],335,pos,nx.in_degree_centrality(G[i]),"Betweeness centrality")
-    draw(G[i],336,pos,nx.in_degree_centrality(G[i]),"Eigenvector centrality")
-    draw(G[i],338,pos,nx.in_degree_centrality(G[i]),"Katz centrality")
-    
+
+for i in range(N):
+    plt.figure('Graph %s:  %s  -  %s'%(str(i),tmsp2str(Tmin+i*dt),tmsp2str(Tmin+(i+1)*dt)))
+    plt.title('Degree Centrality\nGraph size = '+str(G[i].number_of_nodes())+' nodes')
+
+    n = G[i].number_of_nodes()
+    inDegrees = [(n-1)*d for d in nx.in_degree_centrality(G[i]).values()]
+    outDegrees = [(n-1)*d for d in nx.out_degree_centrality(G[i]).values()]
+    degrees = [(n-1)*d for d in nx.degree_centrality(G[i]).values()]
+    plt.hist([inDegrees,outDegrees,degrees], rwidth=1.0, color=['g','b','r'], alpha=0.7, label=['In-Degrees','Out-Degrees','Degrees'])
+
+    plt.xlabel('Degrees')
+    plt.ylabel('Frequencies')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    # TODO gia twra: ypoloipa centralities, closeness, betweeness, eigenvector, katz
+
+
+
