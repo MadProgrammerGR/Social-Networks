@@ -26,7 +26,7 @@ def tmsp2str(seconds):
 
 filename = 'sx-stackoverflow.txt'
 (Tmin,Tmax) = read_min_max_T()
-N=10000
+N=700
 dt=(Tmax-Tmin)//N
 print('Oldest date:',tmsp2str(Tmin))
 print('Newest date:',tmsp2str(Tmax))
@@ -42,32 +42,42 @@ def readNextGraph():
         edge = [int(x) for x in file.readline().split()]
         if not edge or (edge[2]>=now+dt and edge[2]!=Tmax):
             break
-        graph.add_edge(edge[0],edge[1],time=edge[2])
+        if edge[0]!=edge[1]:
+            graph.add_edge(edge[0],edge[1],time=edge[2])
     if not edge: file.close()
     now += dt
     if not graph.number_of_edges() and now<Tmax:
         graph = readNextGraph()
     return graph
 
+def hist_plot(title, measurements, subpos, color):
+    plt.subplot(*subpos)
+    plt.hist(measurements, 30, rwidth=0.9, color=color)
+    plt.ylabel('Frequencies')
+    plt.title(title)
+    plt.grid(True)
 
 for i in range(N):
     G = readNextGraph()
-    plt.figure('Graph %s:  %s  -  %s'%(str(i),tmsp2str(Tmin+i*dt),tmsp2str(Tmin+(i+1)*dt)))
-    plt.title('Degree Centrality\nGraph size = '+str(G.number_of_nodes())+' nodes')
-
     n = G.number_of_nodes()
+    plt.figure('Graph %s:  %s  -  %s'%(str(i),tmsp2str(Tmin+i*dt),tmsp2str(Tmin+(i+1)*dt)))
+    plt.suptitle('Centrality Measurements (Graph size = '+str(n)+')')
+
     inDegrees = [(n-1)*d for d in nx.in_degree_centrality(G).values()]
     outDegrees = [(n-1)*d for d in nx.out_degree_centrality(G).values()]
     degrees = [(n-1)*d for d in nx.degree_centrality(G).values()]
-    plt.hist([inDegrees,outDegrees,degrees], rwidth=1.0, color=['g','b','r'], alpha=0.7, label=['In-Degrees','Out-Degrees','Degrees'])
+    hist_plot('Degrees',[inDegrees,outDegrees,degrees], (3,1,1), ['r','g','b'])
+    plt.legend(['Degree','In-Degree','Out-Degree'])
 
-    plt.xlabel('Degrees')
-    plt.ylabel('Frequencies')
-    plt.legend()
-    plt.grid(True)
+    G = nx.Graph(G) #directed -> undirected
+    hist_plot('Closeness', nx.closeness_centrality(G).values(), (3,2,3), 'xkcd:orangered')
+    hist_plot('Betweenness', nx.betweenness_centrality(G).values(), (3,2,4), 'xkcd:crimson')
+    hist_plot('Eigenvector', nx.eigenvector_centrality(G).values(), (3,2,5), 'xkcd:teal')
+    hist_plot('Katz', nx.katz_centrality_numpy(G).values(), (3,2,6), 'xkcd:brown')
+    plt.tight_layout(rect=(0,0,1,0.95))
     plt.show()
 
-    # TODO gia twra: ypoloipa centralities, closeness, betweeness, eigenvector, katz
+
 
 
 
