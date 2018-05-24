@@ -1,5 +1,4 @@
 import networkx as nx
-import numpy as np
 from matplotlib import pyplot as plt
 from datetime import datetime as date
 
@@ -7,13 +6,17 @@ from datetime import datetime as date
 def read_min_max_T():
     from sys import platform
     import subprocess
-    if "linux" in platform:
-        tmin = int(subprocess.check_output('head -1 '+filename).split()[2])
-        tmax = int(subprocess.check_output('tail -1 '+filename).split()[2])
-    elif "win" in platform:
-        tmin = int(subprocess.check_output('powershell Get-Content '+filename+' -Head 1').split()[2])
-        tmax = int(subprocess.check_output('powershell Get-Content '+filename+' -Tail 1').split()[2])
-    else: #read full file with pandas..
+    ok = True
+    try:
+        if "linux" in platform:
+            tmin = int(subprocess.check_output('head -1 '+filename).split()[2])
+            tmax = int(subprocess.check_output('tail -1 '+filename).split()[2])
+        elif "win" in platform:
+            tmin = int(subprocess.check_output('powershell Get-Content '+filename+' -Head 1').split()[2])
+            tmax = int(subprocess.check_output('powershell Get-Content '+filename+' -Tail 1').split()[2])
+        else: ok = False
+    except: ok = False
+    if not ok: #read full file with pandas..
         import pandas
         data = pandas.read_csv(filename, usecols=[2], delimiter=' ', dtype=int, header=None).values
         tmin = data[:,0].min()
@@ -35,7 +38,7 @@ print('Time interval for each partition:',date.fromtimestamp(Tmin+dt)-date.fromt
 
 file = open(filename,'rU')
 now = Tmin
-def readNextGraph():
+def read_next_graph():
     global now
     graph = nx.DiGraph()
     while True:
@@ -47,7 +50,7 @@ def readNextGraph():
     if not edge: file.close()
     now += dt
     if not graph.number_of_edges() and now<Tmax:
-        graph = readNextGraph()
+        graph = read_next_graph()
     return graph
 
 def hist_plot(title, measurements, subpos, color):
@@ -57,8 +60,7 @@ def hist_plot(title, measurements, subpos, color):
     plt.title(title)
     plt.grid(True)
 
-for i in range(N):
-    G = readNextGraph()
+def plot_centralities(G):
     n = G.number_of_nodes()
     plt.figure('Graph %s:  %s  -  %s'%(str(i),tmsp2str(Tmin+i*dt),tmsp2str(Tmin+(i+1)*dt)))
     plt.suptitle('Centrality Measurements (Graph size = '+str(n)+')')
@@ -72,12 +74,19 @@ for i in range(N):
     G = nx.Graph(G) #directed -> undirected
     hist_plot('Closeness', nx.closeness_centrality(G).values(), (3,2,3), 'xkcd:orangered')
     hist_plot('Betweenness', nx.betweenness_centrality(G).values(), (3,2,4), 'xkcd:crimson')
-    hist_plot('Eigenvector', nx.eigenvector_centrality(G).values(), (3,2,5), 'xkcd:teal')
+    hist_plot('Eigenvector', nx.eigenvector_centrality_numpy(G).values(), (3,2,5), 'xkcd:teal')
     hist_plot('Katz', nx.katz_centrality_numpy(G).values(), (3,2,6), 'xkcd:brown')
     plt.tight_layout(rect=(0,0,1,0.95))
     plt.show()
 
 
+G2 = read_next_graph() #initial
+for i in range(N-1):
+    G1 = G2 #move one graph ahead
+    plot_centralities(G1)
 
+    G2 = read_next_graph()
+    V_star = set(G1.nodes).intersection(set(G2.nodes))
+    G1_star = G1.subgraph(V_star) #subgraph with only nodes-edges in V_star
 
-
+    #TODO continue...
