@@ -1,6 +1,7 @@
 import networkx as nx
 from matplotlib import pyplot as plt
 from datetime import datetime as date
+import heapq
 
 
 def read_min_max_T():
@@ -29,7 +30,7 @@ def tmsp2str(seconds):
 
 filename = 'sx-stackoverflow.txt'
 (Tmin,Tmax) = read_min_max_T()
-N=700
+N=500
 dt=(Tmax-Tmin)//N
 print('Oldest date:',tmsp2str(Tmin))
 print('Newest date:',tmsp2str(Tmax))
@@ -46,7 +47,7 @@ def read_next_graph():
         if not edge or (edge[2]>=now+dt and edge[2]!=Tmax):
             break
         if edge[0]!=edge[1]:
-            graph.add_edge(edge[0],edge[1],time=edge[2])
+            graph.add_edge(edge[0],edge[1])
     if not edge: file.close()
     now += dt
     if not graph.number_of_edges() and now<Tmax:
@@ -65,10 +66,10 @@ def plot_centralities(G):
     plt.figure('Graph %s:  %s  -  %s'%(str(i),tmsp2str(Tmin+i*dt),tmsp2str(Tmin+(i+1)*dt)))
     plt.suptitle('Centrality Measurements (Graph size = '+str(n)+')')
 
-    inDegrees = [(n-1)*d for d in nx.in_degree_centrality(G).values()]
-    outDegrees = [(n-1)*d for d in nx.out_degree_centrality(G).values()]
+    in_degrees = [(n-1)*d for d in nx.in_degree_centrality(G).values()]
+    out_degrees = [(n-1)*d for d in nx.out_degree_centrality(G).values()]
     degrees = [(n-1)*d for d in nx.degree_centrality(G).values()]
-    hist_plot('Degrees',[inDegrees,outDegrees,degrees], (3,1,1), ['r','g','b'])
+    hist_plot('Degrees',[in_degrees,out_degrees,degrees], (3,1,1), ['r','g','b'])
     plt.legend(['Degree','In-Degree','Out-Degree'])
 
     G = nx.Graph(G) #directed -> undirected
@@ -79,14 +80,34 @@ def plot_centralities(G):
     plt.tight_layout(rect=(0,0,1,0.95))
     plt.show()
 
+def predict_edges(name, percent, scored_edges, all_possible_edges):
+    scored_edges = list(scored_edges)
+    predicted_edges = heapq.nlargest(int(percent * len(scored_edges)), scored_edges, key=lambda e: e[2])
+    predicted_edges = [(u, v) for (u, v, s) in predicted_edges]
+    print_prediction_success(name,predicted_edges,all_possible_edges)
 
-G2 = read_next_graph() #initial
+def print_prediction_success(name,predicted_edges,all_possible_edges):
+    correct_edges = [edge for edge in predicted_edges if edge in all_possible_edges]
+    success_ratio = len(correct_edges)/len(predicted_edges)
+    print('%s, success ratio: %.5f'%(name,success_ratio))
+
+
+#TODO parse args for N and probs
+curr_directed_graph = read_next_graph() #initial
 for i in range(N-1):
-    G1 = G2 #move one graph ahead
-    plot_centralities(G1)
+    print('\nGraph',i)
+    next_directed_graph = read_next_graph()
+    plot_centralities(curr_directed_graph)
 
-    G2 = read_next_graph()
-    V_star = set(G1.nodes).intersection(set(G2.nodes))
-    G1_star = G1.subgraph(V_star) #subgraph with only nodes-edges in V_star
+    V_star = set(curr_directed_graph).intersection(set(next_directed_graph))
+    G_star = nx.Graph(curr_directed_graph).subgraph(V_star)  # undirected subgraph with only nodes-edges in V_star
 
-    #TODO continue...
+    #TODO other similarities
+    adamic_adar = nx.adamic_adar_index(G_star)
+    pref_attach = list(nx.preferential_attachment(G_star))
+
+    all_possible_edges = nx.Graph(next_directed_graph).subgraph(V_star).edges
+    predict_edges('Adamic Adar', 0.2, adamic_adar, all_possible_edges)
+    predict_edges('Preferential Attachment', 0.1, pref_attach, all_possible_edges)
+
+    curr_directed_graph = next_directed_graph
