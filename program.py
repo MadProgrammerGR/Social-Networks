@@ -3,6 +3,7 @@ from matplotlib import pyplot as plt
 from datetime import datetime as date
 import heapq
 import itertools
+import argparse
 
 def read_min_max_T():
     from sys import platform
@@ -27,11 +28,25 @@ def read_min_max_T():
 def tmsp2str(seconds):
     return date.fromtimestamp(seconds).strftime('%Y/%m/%d %H:%M')
 
-
-#TODO parse args for filename, N, probs
-filename = 'sx-stackoverflow.txt'
+# https://stackoverflow.com/a/12117065
+def restricted_float(x):
+    x = float(x)
+    if x < 0.0 or x > 1.0:
+        raise argparse.ArgumentTypeError("%r not in range [0.0, 1.0]"%(x,))
+    return x
+parser = argparse.ArgumentParser(description='This program predicts edges on a temporal network and displays centrality measurements.')
+parser.add_argument("filename", help="filename of the temporal network dataset")
+parser.add_argument("N", type=int, help="number of equally spaced time intervals")
+group = parser.add_argument_group('Percentages','Percentages of best edges to keep for specific prediction methods')
+group.add_argument('Pgd', type=restricted_float, nargs='?', default=0.1, help='Graph Distance')
+group.add_argument('Pcn', type=restricted_float, nargs='?', default=0.1, help='Common Neighbors')
+group.add_argument('Pjc', type=restricted_float, nargs='?', default=0.1, help="Jaccard's Coefficient")
+group.add_argument('Paa', type=restricted_float, nargs='?', default=0.1, help='Adamic/Adar')
+group.add_argument('Ppa', type=restricted_float, nargs='?', default=0.1, help='Preferential Attachment')
+args = parser.parse_args()
+filename = args.filename
+N = args.N
 (Tmin,Tmax) = read_min_max_T()
-N=2000
 dt=(Tmax-Tmin)//N
 print('Oldest date:',tmsp2str(Tmin))
 print('Newest date:',tmsp2str(Tmax))
@@ -105,11 +120,11 @@ for i in range(N-1):
     pref_attach = nx.preferential_attachment(G_star,all_pairs)
 
     all_possible_edges = nx.Graph(next_directed_graph).subgraph(V_star).edges
-    predict_edges('Graph Distance', 0.1, graph_d, all_possible_edges)
-    predict_edges('Common Neighbors', 0.2, comm_neighbors, all_possible_edges)
-    predict_edges('Jaccard\'s Coefficient', 0.2, jaccard_coeff, all_possible_edges)
-    predict_edges('Adamic Adar', 0.2, adamic_adar, all_possible_edges)
-    predict_edges('Preferential Attachment', 0.1, pref_attach, all_possible_edges)
+    predict_edges('Graph Distance', args.Pgd, graph_d, all_possible_edges)
+    predict_edges('Common Neighbors', args.Pcn, comm_neighbors, all_possible_edges)
+    predict_edges('Jaccard\'s Coefficient', args.Pjc, jaccard_coeff, all_possible_edges)
+    predict_edges('Adamic Adar', args.Paa, adamic_adar, all_possible_edges)
+    predict_edges('Preferential Attachment', args.Ppa, pref_attach, all_possible_edges)
 
     plot_centralities(curr_directed_graph)
     curr_directed_graph = next_directed_graph
