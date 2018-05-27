@@ -2,7 +2,7 @@ import networkx as nx
 from matplotlib import pyplot as plt
 from datetime import datetime as date
 import heapq
-
+import itertools
 
 def read_min_max_T():
     from sys import platform
@@ -28,9 +28,10 @@ def tmsp2str(seconds):
     return date.fromtimestamp(seconds).strftime('%Y/%m/%d %H:%M')
 
 
+#TODO parse args for filename, N, probs
 filename = 'sx-stackoverflow.txt'
 (Tmin,Tmax) = read_min_max_T()
-N=500
+N=2000
 dt=(Tmax-Tmin)//N
 print('Oldest date:',tmsp2str(Tmin))
 print('Newest date:',tmsp2str(Tmax))
@@ -83,31 +84,32 @@ def plot_centralities(G):
 def predict_edges(name, percent, scored_edges, all_possible_edges):
     scored_edges = list(scored_edges)
     predicted_edges = heapq.nlargest(int(percent * len(scored_edges)), scored_edges, key=lambda e: e[2])
-    predicted_edges = [(u, v) for (u, v, s) in predicted_edges]
-    print_prediction_success(name,predicted_edges,all_possible_edges)
-
-def print_prediction_success(name,predicted_edges,all_possible_edges):
-    correct_edges = [edge for edge in predicted_edges if edge in all_possible_edges]
-    success_ratio = len(correct_edges)/len(predicted_edges)
-    print('%s, success ratio: %.5f'%(name,success_ratio))
+    success_ratio = sum(1 for (u,v,s) in predicted_edges if (u,v) in all_possible_edges)/len(predicted_edges)
+    print('%s, successful predictions: %.2f%%'%(name,100*success_ratio))
 
 
-#TODO parse args for N and probs
 curr_directed_graph = read_next_graph() #initial
 for i in range(N-1):
     print('\nGraph',i)
     next_directed_graph = read_next_graph()
-    plot_centralities(curr_directed_graph)
 
     V_star = set(curr_directed_graph).intersection(set(next_directed_graph))
     G_star = nx.Graph(curr_directed_graph).subgraph(V_star)  # undirected subgraph with only nodes-edges in V_star
+    all_pairs = list(itertools.combinations(G_star.nodes,2))
 
-    #TODO other similarities
-    adamic_adar = nx.adamic_adar_index(G_star)
-    pref_attach = list(nx.preferential_attachment(G_star))
+    graph_d = dict(nx.all_pairs_shortest_path_length(G_star))
+    graph_d = [(u,v,-graph_d[u][v]) if v in graph_d[u] else (u,v,float('-inf')) for (u,v) in all_pairs]
+    comm_neighbors = [(u,v,sum(1 for n in nx.common_neighbors(G_star,u,v))) for (u,v) in all_pairs]
+    jaccard_coeff = nx.jaccard_coefficient(G_star,all_pairs)
+    adamic_adar = nx.adamic_adar_index(G_star,all_pairs)
+    pref_attach = nx.preferential_attachment(G_star,all_pairs)
 
     all_possible_edges = nx.Graph(next_directed_graph).subgraph(V_star).edges
+    predict_edges('Graph Distance', 0.1, graph_d, all_possible_edges)
+    predict_edges('Common Neighbors', 0.2, comm_neighbors, all_possible_edges)
+    predict_edges('Jaccard\'s Coefficient', 0.2, jaccard_coeff, all_possible_edges)
     predict_edges('Adamic Adar', 0.2, adamic_adar, all_possible_edges)
     predict_edges('Preferential Attachment', 0.1, pref_attach, all_possible_edges)
 
+    plot_centralities(curr_directed_graph)
     curr_directed_graph = next_directed_graph
