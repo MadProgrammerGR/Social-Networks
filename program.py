@@ -1,9 +1,12 @@
 import networkx as nx
 from matplotlib import pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 from datetime import datetime as date
 import heapq
 import itertools
 import argparse
+
+topdf = True
 
 def read_min_max_T():
     from sys import platform
@@ -55,6 +58,8 @@ print('Time interval for each partition:',date.fromtimestamp(Tmin+dt)-date.fromt
 
 file = open(filename,'rU')
 now = Tmin
+if topdf:
+    pp = PdfPages("output.pdf")
 def read_next_graph():
     global now
     graph = nx.DiGraph()
@@ -94,7 +99,8 @@ def plot_centralities(G):
     hist_plot('Eigenvector', nx.eigenvector_centrality_numpy(G).values(), (3,2,5), 'xkcd:teal')
     hist_plot('Katz', nx.katz_centrality_numpy(G).values(), (3,2,6), 'xkcd:brown')
     plt.tight_layout(rect=(0,0,1,0.95))
-    plt.show()
+    pp.savefig()
+    plt.close()
 
 def predict_edges(name, percent, scored_edges, all_possible_edges):
     scored_edges = list(scored_edges)
@@ -104,27 +110,31 @@ def predict_edges(name, percent, scored_edges, all_possible_edges):
 
 
 curr_directed_graph = read_next_graph() #initial
-for i in range(N-1):
-    print('\nGraph',i)
-    next_directed_graph = read_next_graph()
+try:
+    for i in range(N-1):
+        print('\nGraph',i)
+        next_directed_graph = read_next_graph()
 
-    V_star = set(curr_directed_graph).intersection(set(next_directed_graph))
-    G_star = nx.Graph(curr_directed_graph).subgraph(V_star)  # undirected subgraph with only nodes-edges in V_star
-    all_pairs = list(itertools.combinations(G_star.nodes,2))
+        V_star = set(curr_directed_graph).intersection(set(next_directed_graph))
+        G_star = nx.Graph(curr_directed_graph).subgraph(V_star)  # undirected subgraph with only nodes-edges in V_star
+        all_pairs = list(itertools.combinations(G_star.nodes,2))
 
-    graph_d = dict(nx.all_pairs_shortest_path_length(G_star))
-    graph_d = [(u,v,-graph_d[u][v]) if v in graph_d[u] else (u,v,float('-inf')) for (u,v) in all_pairs]
-    comm_neighbors = [(u,v,sum(1 for n in nx.common_neighbors(G_star,u,v))) for (u,v) in all_pairs]
-    jaccard_coeff = nx.jaccard_coefficient(G_star,all_pairs)
-    adamic_adar = nx.adamic_adar_index(G_star,all_pairs)
-    pref_attach = nx.preferential_attachment(G_star,all_pairs)
+        graph_d = dict(nx.all_pairs_shortest_path_length(G_star))
+        graph_d = [(u,v,-graph_d[u][v]) if v in graph_d[u] else (u,v,float('-inf')) for (u,v) in all_pairs]
+        comm_neighbors = [(u,v,sum(1 for n in nx.common_neighbors(G_star,u,v))) for (u,v) in all_pairs]
+        jaccard_coeff = nx.jaccard_coefficient(G_star,all_pairs)
+        adamic_adar = nx.adamic_adar_index(G_star,all_pairs)
+        pref_attach = nx.preferential_attachment(G_star,all_pairs)
 
-    all_possible_edges = nx.Graph(next_directed_graph).subgraph(V_star).edges
-    predict_edges('Graph Distance', args.Pgd, graph_d, all_possible_edges)
-    predict_edges('Common Neighbors', args.Pcn, comm_neighbors, all_possible_edges)
-    predict_edges('Jaccard\'s Coefficient', args.Pjc, jaccard_coeff, all_possible_edges)
-    predict_edges('Adamic Adar', args.Paa, adamic_adar, all_possible_edges)
-    predict_edges('Preferential Attachment', args.Ppa, pref_attach, all_possible_edges)
+        all_possible_edges = nx.Graph(next_directed_graph).subgraph(V_star).edges
+        predict_edges('Graph Distance', args.Pgd, graph_d, all_possible_edges)
+        predict_edges('Common Neighbors', args.Pcn, comm_neighbors, all_possible_edges)
+        predict_edges('Jaccard\'s Coefficient', args.Pjc, jaccard_coeff, all_possible_edges)
+        predict_edges('Adamic Adar', args.Paa, adamic_adar, all_possible_edges)
+        predict_edges('Preferential Attachment', args.Ppa, pref_attach, all_possible_edges)
 
-    plot_centralities(curr_directed_graph)
-    curr_directed_graph = next_directed_graph
+        plot_centralities(curr_directed_graph)
+        curr_directed_graph = next_directed_graph
+finally:
+    if topdf:
+        pp.close()
