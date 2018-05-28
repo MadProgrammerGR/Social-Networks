@@ -6,8 +6,6 @@ import heapq
 import itertools
 import argparse
 
-topdf = True
-
 def read_min_max_T():
     from sys import platform
     import subprocess
@@ -40,6 +38,7 @@ def restricted_float(x):
 parser = argparse.ArgumentParser(description='This program predicts edges on a temporal network and displays centrality measurements.')
 parser.add_argument("filename", help="filename of the temporal network dataset")
 parser.add_argument("N", type=int, help="number of equally spaced time intervals")
+parser.add_argument('--PDF', metavar='filename', help='save distributions on pdf file instead')
 group = parser.add_argument_group('Percentages','Percentages of best edges to keep for specific prediction methods')
 group.add_argument('Pgd', type=restricted_float, nargs='?', default=0.1, help='Graph Distance')
 group.add_argument('Pcn', type=restricted_float, nargs='?', default=0.1, help='Common Neighbors')
@@ -58,8 +57,8 @@ print('Time interval for each partition:',date.fromtimestamp(Tmin+dt)-date.fromt
 
 file = open(filename,'rU')
 now = Tmin
-if topdf:
-    pp = PdfPages("output.pdf")
+if args.PDF:
+    pp = PdfPages(args.PDF)
 def read_next_graph():
     global now
     graph = nx.DiGraph()
@@ -99,8 +98,10 @@ def plot_centralities(G):
     hist_plot('Eigenvector', nx.eigenvector_centrality_numpy(G).values(), (3,2,5), 'xkcd:teal')
     hist_plot('Katz', nx.katz_centrality_numpy(G).values(), (3,2,6), 'xkcd:brown')
     plt.tight_layout(rect=(0,0,1,0.95))
-    pp.savefig()
-    plt.close()
+    if args.PDF:
+        pp.savefig()
+        plt.close()
+    else: plt.show()
 
 def predict_edges(name, percent, scored_edges, all_possible_edges):
     scored_edges = list(scored_edges)
@@ -135,6 +136,7 @@ try:
 
         plot_centralities(curr_directed_graph)
         curr_directed_graph = next_directed_graph
-finally:
-    if topdf:
+except KeyboardInterrupt:
+    file.close()
+    if args.PDF:
         pp.close()
