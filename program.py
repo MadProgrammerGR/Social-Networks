@@ -40,11 +40,11 @@ parser.add_argument("filename", help="filename of the temporal network dataset")
 parser.add_argument("N", type=int, help="number of equally spaced time intervals")
 parser.add_argument('--PDF', metavar='filename', help='save distributions on pdf file instead')
 group = parser.add_argument_group('Percentages','Percentages of best edges to keep for specific prediction methods')
-group.add_argument('Pgd', type=restricted_float, nargs='?', default=0.1, help='Graph Distance')
-group.add_argument('Pcn', type=restricted_float, nargs='?', default=0.1, help='Common Neighbors')
-group.add_argument('Pjc', type=restricted_float, nargs='?', default=0.1, help="Jaccard's Coefficient")
-group.add_argument('Paa', type=restricted_float, nargs='?', default=0.1, help='Adamic/Adar')
-group.add_argument('Ppa', type=restricted_float, nargs='?', default=0.1, help='Preferential Attachment')
+group.add_argument('Pgd', type=restricted_float, nargs='?', default=0.05, help='Graph Distance')
+group.add_argument('Pcn', type=restricted_float, nargs='?', default=0.05, help='Common Neighbors')
+group.add_argument('Pjc', type=restricted_float, nargs='?', default=0.05, help="Jaccard's Coefficient")
+group.add_argument('Paa', type=restricted_float, nargs='?', default=0.05, help='Adamic/Adar')
+group.add_argument('Ppa', type=restricted_float, nargs='?', default=0.05, help='Preferential Attachment')
 args = parser.parse_args()
 filename = args.filename
 N = args.N
@@ -103,11 +103,13 @@ def plot_centralities(G):
         plt.close()
     else: plt.show()
 
-def predict_edges(name, percent, scored_edges, all_possible_edges):
+def predict_edges(name, percent, scored_edges, correct_edges):
     scored_edges = list(scored_edges)
     predicted_edges = heapq.nlargest(int(percent * len(scored_edges)), scored_edges, key=lambda e: e[2])
-    success_ratio = sum(1 for (u,v,s) in predicted_edges if (u,v) in all_possible_edges)/len(predicted_edges)
-    print('%s, successful predictions: %.2f%%'%(name,100*success_ratio))
+    # success_ratio = sum(1 for (u,v,s) in predicted_edges if (u,v) in correct_edges)/len(predicted_edges)
+    # print('%s, successful predictions: %.2f%% from %d predicted edges'%(name,100*success_ratio,len(predicted_edges)))
+    num_succesful = sum(1 for (u, v, s) in predicted_edges if (u, v) in correct_edges)
+    print('%30s%30d%30d%7.2f%%'%(name,num_succesful,len(predicted_edges),100*num_succesful/len(predicted_edges)))
 
 
 curr_directed_graph = read_next_graph() #initial
@@ -127,12 +129,15 @@ try:
         adamic_adar = nx.adamic_adar_index(G_star,all_pairs)
         pref_attach = nx.preferential_attachment(G_star,all_pairs)
 
-        all_possible_edges = nx.Graph(next_directed_graph).subgraph(V_star).edges
-        predict_edges('Graph Distance', args.Pgd, graph_d, all_possible_edges)
-        predict_edges('Common Neighbors', args.Pcn, comm_neighbors, all_possible_edges)
-        predict_edges('Jaccard\'s Coefficient', args.Pjc, jaccard_coeff, all_possible_edges)
-        predict_edges('Adamic Adar', args.Paa, adamic_adar, all_possible_edges)
-        predict_edges('Preferential Attachment', args.Ppa, pref_attach, all_possible_edges)
+        correct_edges = nx.Graph(next_directed_graph).subgraph(V_star).edges
+
+        print('%30s%30s%30s%7s' %('Method','Successfully predicted edges','Total predicted edges','Ratio'))
+        print('%30s%30d%30d%7.2f%%'%('Random Selection',len(correct_edges),len(all_pairs),100*len(correct_edges)/len(all_pairs)))
+        predict_edges('Graph Distance', args.Pgd, graph_d, correct_edges)
+        predict_edges('Common Neighbors', args.Pcn, comm_neighbors, correct_edges)
+        predict_edges('Jaccard\'s Coefficient', args.Pjc, jaccard_coeff, correct_edges)
+        predict_edges('Adamic Adar', args.Paa, adamic_adar, correct_edges)
+        predict_edges('Preferential Attachment', args.Ppa, pref_attach, correct_edges)
 
         plot_centralities(curr_directed_graph)
         curr_directed_graph = next_directed_graph
